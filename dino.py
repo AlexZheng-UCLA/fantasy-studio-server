@@ -5,9 +5,9 @@ import numpy as np
 from PIL import Image
 from collections import OrderedDict
 
+device = "cuda" if torch.cuda.is_available() else "cpu"
 dino_model_cache = OrderedDict()
 dino_model_dir = "/root/autodl-tmp/models/dino"
-dino_model_list = ["T", "B"]
 dino_model = {
     "T": {
         "name": "GroundingDINO_SwinT_OGC",
@@ -78,7 +78,7 @@ def load_dino_image(image_pil):
     image, _ = transform(image_pil, None)  # 3, h, w
     return image
 
-def get_grounding_output(model, image, caption, box_threshold):
+def get_grounding_output(model, image, caption, num_boxes, box_threshold):
     caption = caption.lower()
     caption = caption.strip()
     if not caption.endswith("."):
@@ -89,28 +89,32 @@ def get_grounding_output(model, image, caption, box_threshold):
     logits = outputs["pred_logits"].sigmoid()[0]  # (nq, 256)
     boxes = outputs["pred_boxes"][0]  # (nq, 4)
 
-    # filter output
-    mask = logits.max(dim=1)[0] > box_threshold
+    # get the index of max num_boxes
+    max_logits = logits.max(dim=1)[0]
+    mask = torch.zeros_like(max_logits, dtype=torch.bool)
+    for i in range(int(num_boxes)):
+        if max_logits[i] > box_threshold:
+            mask[i] = 1
+    
     logits_filtered = logits[mask]  # num_filt, 256
     boxes_filtered = boxes[mask]  # num_filt, 4
 
     return boxes_filtered.cpu()
 
 
-def dino_predict(dino_model_type, input_image, text_prompt, box_threshold):
+def dino_predict(dino_model_type, input_image, text_prompt, num_boxes, box_threshold):
     dino, msg = load_dino_model(dino_model_type)
     if not dino:
         return False, msg
     
     image = load_dino_image(input_image.convert("RGB"))
     boxes = get_grounding_output(
-        dino, image, text_prompt, box_threshold
+        dino, image, text_prompt, num_boxes, box_threshold
     )
 
     H, W = input_image.size[1], input_image.size[0]
     for i in range(boxes.size(0)):
         boxes[i] = boxes[i] * torch.Tensor([W, H, W, H])
-        print(boxes[i].shape)
         boxes[i][:2] -= boxes[i][2:] / 2
         boxes[i][2:] += boxes[i][:2]
 
@@ -127,5 +131,5 @@ if __name__ == "__main__":
         print(msg)
     
     
-    boxes = dino_predict(dino_model_type, images[0], "t-shirt", 0.4)
+    boxes = dino_predict(dino_model_type, images[0], "t-shirt", 2, 0.4)
     print(boxes)
