@@ -9,8 +9,11 @@ from dino import dino_predict
 from sam import load_sam_model, create_mask_output_and_save
 from image import load_img_from_path, load_background_from_path, move_masked_add_background
 from util import garbage_collect
+import warnings
 
+warnings.filterwarnings("ignore")
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 def full_process(
     sam_model_type, 
     dino_model_type, 
@@ -21,7 +24,8 @@ def full_process(
     img_source_dir, 
     background_dir,
     save_dir,
-    multimask_output=False,
+    multimask_output=True,
+    mask_option="first",
     save_image=True, 
     save_mask=True, 
     save_background=True,
@@ -90,7 +94,7 @@ def full_process(
             process_info += (msg + "\n") if msg else ""
 
         img_processed, msg = move_masked_add_background(
-            filename_list[idx], save_dir, img_np, background_list, merged_masks, save_process)
+            filename_list[idx], save_dir, img_np, background_list, merged_masks, mask_option, save_process)
 
     garbage_collect(sam)
     return process_info + "Done"
@@ -110,7 +114,8 @@ if __name__ == "__main__":
     box_threshold = 0.5
     dilation_amt = 0
 
-    multimask_output = True
+    multimask_output = False
+    mask_option = "largest"  # ["first", "1", "2", "3", "largest", "smallest"]
     save_image = True
     save_mask = False
     save_background = False
@@ -129,6 +134,7 @@ if __name__ == "__main__":
         background_dir = background_dir,
         save_dir=save_dir,
         multimask_output=multimask_output,
+        mask_option=mask_option,
         save_image=save_image, 
         save_mask=save_mask, 
         save_background=save_background,

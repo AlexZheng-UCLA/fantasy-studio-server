@@ -8,6 +8,7 @@ import shutil
 from collections import OrderedDict
 from scipy.ndimage import binary_dilation
 from segment_anything import SamPredictor, SamAutomaticMaskGenerator, sam_model_registry
+from image import load_img_from_path
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 sam_model_cache = OrderedDict()
@@ -52,6 +53,7 @@ def mask_entire_image(sam_model, image):
     masks = mask_generator.generate(image)
     return masks
 
+
 def dilate_mask(mask, dilation_amt):
     x, y = np.meshgrid(np.arange(dilation_amt), np.arange(dilation_amt))
     center = dilation_amt // 2
@@ -65,9 +67,9 @@ def show_masks(img_np, masks, alpha=0.5):
     np.random.seed(0)
     img_np_copy = copy.deepcopy(img_np)
     for mask in masks:
-        color = np.random.rand(3)
-        img_np_copy[mask] = img_np_copy[mask] * (1 - alpha) + color * alpha * 255
-    return img_np_copy
+        color = np.random.randint(0, 255, 3)
+        img_np_copy[mask][:, :3] = img_np_copy[mask][:, :3] * (1 - alpha) + color * alpha
+    return img_np_copy.astype(np.uint8)
 
 def show_boxes(img_np, boxes, color=(255, 0, 0, 255), thickness=2, show_index=False):
     if boxes is None:
@@ -150,7 +152,7 @@ def create_mask_output_and_save(
             output_matted.save(os.path.join(save_dir, f"{filename}_{idx}_matted{ext}"))
         
         merged_masks.append(merged_mask)
-    return merged_mask, msg
+    return merged_masks, msg
 
 def sam_predict(sam_model_type, img_np, box_filters=None, positive_points=[], negative_points=[],):
     print("Start SAM Processing")

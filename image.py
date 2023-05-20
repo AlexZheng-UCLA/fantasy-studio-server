@@ -1,6 +1,7 @@
 import numpy as np
 import os
 import cv2
+import copy
 from PIL import Image
 
 def load_img_from_path(img_dir_path):
@@ -23,45 +24,92 @@ def load_img_from_path(img_dir_path):
     return img_list, filename_list, None
 
 
+def unify_image_version(img_np, version="rgb"):
+    img_np_copy = copy.deepcopy(img_np)
+    if version=="rgb":
+        if len(img_np_copy.shape) == 2:  # Grayscale image
+            # Convert to RGB
+            img_np_copy = np.stack((img_np_copy,) * 3, axis=-1)
+        elif len(img_np_copy.shape) == 3 and img_np_copy.shape[-1] == 4:  # RGBA image
+            # Convert to RGB by discarding the alpha channel
+            img_np_copy = img_np_copy[:, :, :3]
+        return img_np_copy
+
+    elif version=="rgba":
+        if len(img_np_copy.shape) == 2:  # Grayscale image
+            # Convert to RGBA by repeating grayscale for R, G, B, and setting A to max value
+            img_np_copy = np.stack((img_np_copy,) * 3 + (np.full(img_np_copy.shape, 255),), axis=-1)
+        elif len(img_np_copy.shape) == 3 and img_np_copy.shape[-1] == 3:  # RGB image
+            # Convert to RGBA by adding a new alpha channel with max value
+            alpha_channel = np.full((img_np_copy.shape[0], img_np_copy.shape[1]), 255)
+            img_np_copy = np.dstack((img_np_copy, alpha_channel))
+
+    return img_np_copy
+
+
 def move_masked_add_background(
     file_name, 
     save_dir, 
     img_np,
     background_list, 
-    merged_masks, 
-    save_image
+    merged_masks,
+    mask_option, 
+    save_image,
 ):
+    msg = ""
     image = Image.fromarray(img_np)
     width, height = image.size
     size = max(width, height)
-    # only take the first mask
-    mask = merged_masks
-    print(f" mask shape: {mask.shape}")
+
+    if mask_option == "first":
+        mask = merged_masks[0]
+    elif mask_option == "1" or mask_option == "2" or mask_option == "3":
+        mask = merged_masks[int(mask_option)-1]
+    elif mask_option == "largest":
+        mask = merged_masks[np.argmax([np.sum(mask) for mask in merged_masks])]
+    elif mask_option == "smallest":
+        mask = merged_masks[np.argmin([np.sum(mask) for mask in merged_masks])]
+
     processed_images = []
-    for idx, background in enumerate(background_list):
-
+    img_np_copy = copy.deepcopy(img_np)
         # find the mask width and height
-        mask_height = np.sum(mask, axis=0).max()
-        mask_width = np.sum(mask, axis=1).max()
-        mask_median_hpos = np.mean(np.median(np.where(mask), axis=1)).astype(int)
-        mask_median_vpos = np.mean(np.median(np.where(mask), axis=0)).astype(int)
+        
+    mask_vpos, mask_hpos = np.where(mask==1)
+    mask_width = np.max(mask_hpos) - np.min(mask_hpos)
+    mask_height = np.max(mask_vpos) - np.min(mask_vpos)
+    mask_median_hpos = np.median(mask_hpos).astype(int)
+    mask_median_vpos = np.median(mask_vpos).astype(int)
 
-        hshift = width // 2 - mask_median_hpos
-        mask_shifted = np.roll(mask, hshift, axis=1)
-        # Since np.roll wraps the values around, we want to zero out the wrapped values on the side
-        mask_shifted[:, :hshift] = 0
+    if width // 2 - mask_median_hpos > 0: # right shft
+        hshift = min(width // 2 - mask_median_hpos, width - mask_width)
+    else:                                 # left shift 
+        hshift = max(width // 2 - mask_median_hpos, mask_width - width)
 
+    msg += f"mask_width: {mask_width}, mask_height: {mask_height}, mask_median_hpos: {mask_median_hpos}, mask_median_vpos: {mask_median_vpos}, hshift: {hshift}"
+
+    for idx, background in enumerate(background_list):
+        
         background = background.resize((size, size))
         background_np = np.array(background)
-        background_np = background_np[:height, :width, :]
+        background_np = background_np[:height, :width]
 
-        background_np[mask_shifted] = np.zeros(len(background_np.shape))
+        if background_np.shape[-1] < img_np_copy.shape[-1]:
+            background_np = unify_image_version(background_np, version="rgba")
+        elif background_np.shape[-1] > img_np_copy.shape[-1]:
+            img_np_copy = unify_image_version(img_np_copy, version="rgba")
+
+        for i in range(width):
+            for j in range(height):
+                if mask[i, j] and 0 <= j+hshift < width:
+                    background_np[i, j+hshift, :] = img_np_copy[i, j, :]
+
+        background_np = background_np.astype(np.uint8)
         img_processed = Image.fromarray(background_np)
         if save_image:
             img_processed.save(os.path.join(save_dir, f"{file_name}_processed_{idx}.png"))
 
         processed_images.append(img_processed)
-    return processed_images, None
+    return processed_images, msg
 
 
 def load_background_from_path(background_dir):
@@ -79,7 +127,7 @@ def load_background_from_path(background_dir):
             # open filename image as numpy
             background = Image.open(background_path)
             background_list.append(background)
-    return background_list, None
+    return background_list, "Load background from path successfully"
 
 
 def generate_pure_background(width, height, save_dir):
