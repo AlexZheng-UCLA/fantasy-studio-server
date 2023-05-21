@@ -1,3 +1,7 @@
+Flask
+Flask-Cors
+Celery
+redis
 torch
 torchvision
 transformers

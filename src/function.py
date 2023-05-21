@@ -5,14 +5,15 @@ import numpy as np
 import cv2
 from scipy.ndimage import binary_dilation
 from segment_anything import SamPredictor
-from dino import dino_predict
-from sam import load_sam_model, create_mask_output_and_save
-from image import load_img_from_path, load_background_from_path, move_masked_add_background
-from util import garbage_collect
+from src.dino import dino_predict
+from src.sam import load_sam_model, create_mask_output_and_save
+from src.image import load_img_from_path, load_background_from_path, move_masked_add_background
+from src.util import garbage_collect
 import warnings
 
 warnings.filterwarnings("ignore")
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+# device = "cpu"
 
 def full_process(
     sam_model_type, 

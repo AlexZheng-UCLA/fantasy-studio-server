@@ -57,24 +57,30 @@ def move_masked_add_background(
     save_image,
 ):
     msg = ""
-    image = Image.fromarray(img_np)
-    width, height = image.size
+    width, height = img_np.shape[1], img_np.shape[0]
     size = max(width, height)
+    if not merged_masks:
+        raise ValueError("merged_masks is empty")
+    try:
+        if mask_option == "first":
+            mask = merged_masks[0]
+        elif mask_option in ["1", "2", "3"]:
+            mask = merged_masks[int(mask_option)-1]
+        elif mask_option == "largest":
+            mask = merged_masks[np.argmax([np.sum(mask) for mask in merged_masks])]
+        elif mask_option == "smallest":
+            mask = merged_masks[np.argmin([np.sum(mask) for mask in merged_masks])]
+        else:
+            mask = merged_masks[0]
+            msg += "mask_option is not valid, use the first mask as default"
+    except IndexError:
+        raise ValueError(f"merged_masks does not have enough elements for mask_option {mask_option}")
 
-    if mask_option == "first":
-        mask = merged_masks[0]
-    elif mask_option == "1" or mask_option == "2" or mask_option == "3":
-        mask = merged_masks[int(mask_option)-1]
-    elif mask_option == "largest":
-        mask = merged_masks[np.argmax([np.sum(mask) for mask in merged_masks])]
-    elif mask_option == "smallest":
-        mask = merged_masks[np.argmin([np.sum(mask) for mask in merged_masks])]
 
     processed_images = []
     img_np_copy = copy.deepcopy(img_np)
-        # find the mask width and height
-        
-    mask_vpos, mask_hpos = np.where(mask==1)
+
+    mask_vpos, mask_hpos = np.where(mask)
     mask_width = np.max(mask_hpos) - np.min(mask_hpos)
     mask_height = np.max(mask_vpos) - np.min(mask_vpos)
     mask_median_hpos = np.median(mask_hpos).astype(int)

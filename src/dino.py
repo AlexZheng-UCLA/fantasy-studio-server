@@ -6,6 +6,7 @@ from PIL import Image
 from collections import OrderedDict
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
+# device = "cpu"
 dino_model_cache = OrderedDict()
 dino_model_dir = "/root/autodl-tmp/models/dino"
 dino_model = {

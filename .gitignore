@@ -1,0 +1,6 @@
+*.pyc
+
+dump.rdb
+output
+boto3
+uploads

@@ -8,9 +8,9 @@ import shutil
 from collections import OrderedDict
 from scipy.ndimage import binary_dilation
 from segment_anything import SamPredictor, SamAutomaticMaskGenerator, sam_model_registry
-from image import load_img_from_path
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+# device = "cpu"
 sam_model_cache = OrderedDict()
 sam_model_dir = "/root/autodl-tmp/models/sam"
 sam_model = {
