@@ -134,22 +134,32 @@ def create_mask_output_and_save(
 
         if save_image:
             output_image = Image.fromarray(img_np)
-            output_image.save(os.path.join(save_dir, f"{filename}_{idx}_original{ext}"))
+            output_image.save(os.path.join(save_dir, f"{filename}_{idx}_1original{ext}"))
         if save_mask:
             output_mask = Image.fromarray(merged_mask)
-            output_mask.save(os.path.join(save_dir, f"{filename}_{idx}_mask{ext}"))
+            output_mask.save(os.path.join(save_dir, f"{filename}_{idx}_3mask{ext}"))
         if save_image_background:
             background_mask = ~merged_mask
             output_mask = Image.fromarray(background_mask)
-            output_mask.save(os.path.join(save_dir, f"{filename}_{idx}_background{ext}"))
+            output_mask.save(os.path.join(save_dir, f"{filename}_{idx}_5background{ext}"))
         if save_image_blend:
             output_blend = Image.fromarray(blended_image)
-            output_blend.save(os.path.join(save_dir, f"{filename}_{idx}_blend{ext}"))
+            output_blend.save(os.path.join(save_dir, f"{filename}_{idx}_2blend{ext}"))
         if save_image_masked:
             output_matted = img_np.copy()
-            output_matted[~merged_mask] = np.zeros(len(img_np.shape))
-            output_matted = Image.fromarray(output_matted)
-            output_matted.save(os.path.join(save_dir, f"{filename}_{idx}_matted{ext}"))
+               # check if there is an alpha channel
+            if output_matted.shape[2] == 4:
+                # set alpha to 0 for the region to be transparent
+                output_matted[~merged_mask, 3] = 0
+            else:
+                # if no alpha channel exists, create one
+                h, w = output_matted.shape[:2]
+                alpha = np.ones((h, w)) * 255
+                alpha[~merged_mask] = 0
+                output_matted = np.dstack([output_matted, alpha]) 
+
+            output_matted = Image.fromarray(output_matted.astype(np.uint8))
+            output_matted.save(os.path.join(save_dir, f"{filename}_{idx}_4matted.png"))
         
         merged_masks.append(merged_mask)
     return merged_masks, msg

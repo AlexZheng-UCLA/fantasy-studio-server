@@ -26,7 +26,7 @@ def full_process(
     background_dir,
     save_dir,
     multimask_output=True,
-    mask_option="first",
+    mask_option="1",
     save_image=True, 
     save_mask=True, 
     save_background=True,
@@ -39,9 +39,8 @@ def full_process(
         return "Please add text prompts to generate masks"
     print("Start groundingdino + sam processing")
     # get the parent folder of save_dir 
-    output_dir = "/root/fstudio/output"
-    if not os.path.exists(output_dir):
-        os.mkdir(output_dir) 
+    if not os.path.exists(save_dir):
+        os.mkdir(save_dir)
 
     process_info = ""
     sam, msg = load_sam_model(sam_model_type)
@@ -88,14 +87,14 @@ def full_process(
         else:
             process_info += (msg + "\n") if msg else ""
 
-        background_list, img = load_background_from_path(background_dir)
-        if background_list is None:
-            return msg
-        else:
-            process_info += (msg + "\n") if msg else ""
+        # background_list, img = load_background_from_path(background_dir)
+        # if background_list is None:
+        #     return msg
+        # else:
+        #     process_info += (msg + "\n") if msg else ""
 
-        img_processed, msg = move_masked_add_background(
-            filename_list[idx], save_dir, img_np, background_list, merged_masks, mask_option, save_process)
+        # img_processed, msg = move_masked_add_background(
+        #     filename_list[idx], save_dir, img_np, background_list, merged_masks, mask_option, save_process)
 
     garbage_collect(sam)
     return process_info + "Done"

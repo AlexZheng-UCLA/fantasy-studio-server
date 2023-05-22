@@ -2,7 +2,7 @@ import torch.multiprocessing as mp
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from app_celery import make_celery, full_process_task
-from worker import _full_process
+from worker import _full_process, _upload_files, _get_images
 from werkzeug.utils import secure_filename
 import os 
 
@@ -19,46 +19,56 @@ app.config['CELERY_BACKEND'] = 'rpc://localhost//'
 # celery = make_celery(app)
 
 
+@app.route('/api/images/<user>', methods=['GET'])
+def get_images(user):
+    images = _get_images(user)
+    return jsonify({
+        "images": images,
+        "msg": "Suceessfully Retrieved Images"
+        }), 200
+
+
 @app.route('/api/full', methods=['POST'])
 def full_process():
     metadata = request.get_json()
     print(metadata)
     # process_info = full_process_task.delay(metadata)
     process_info = _full_process(metadata)
-    return jsonify({'info': process_info}), 202
+
+    return jsonify({
+        'msg': 'Successfully Processed',
+        'process_info': process_info
+        }), 202
 
 
 @app.route('/api/upload', methods=['POST'])
 def upload_files():
     user = request.form.get('user')
     files = request.files.getlist('files')
+    filenames, save_paths = _upload_files(user, files)
+    return jsonify({
+        'user': user,
+        'filenames': filenames, 
+        'save_paths': save_paths,
+        'msg': f"Successfully Uploaded "
+        }), 202
 
-    filenames = []
-    for file in files:
-        if file:
-            
-            # save to local storage
-            print(file.filename)
-            filenames.append(file.filename)
-            if not os.path.exists(f'/root/fstudio/uploads/{user}'):
-                os.makedirs(f'/root/fstudio/uploads/{user}')
-            file.save(f'/root/fstudio/uploads/{user}/{file.filename}')
 
-            # filename = secure_filename(file.filename)
-            # file.save(filename)
+        # filename = secure_filename(file.filename)
+        # file.save(filename)
 
-            # # Define the S3 path based on the username
-            # s3_path = f'{username}/{filename}'
+        # # Define the S3 path based on the username
+        # s3_path = f'{username}/{filename}'
 
-            # # Upload the file to S3
-            # s3.upload_file(
-            #     Bucket='your-bucket-name',
-            #     Filename=filename,
-            #     Key=s3_path
-            # )
+        # # Upload the file to S3
+        # s3.upload_file(
+        #     Bucket='your-bucket-name',
+        #     Filename=filename,
+        #     Key=s3_path
+        # )
 
-            # # Delete the file from local after upload to S3
-            # os.remove(filename)
+        # # Delete the file from local after upload to S3
+        # os.remove(filename)
 
     return jsonify({'info': f"Successfully Uploaded {filenames}"}), 202
 
